@@ -1,0 +1,10 @@
+/.dapper
+/bin
+/dist
+*.swp
+/.trash-cache
+/.home
+/.kontainer
+/.trash-conf
+kontainer-engine
+/trash.lock
