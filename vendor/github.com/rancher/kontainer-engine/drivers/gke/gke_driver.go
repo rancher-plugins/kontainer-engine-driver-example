@@ -214,8 +214,9 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 		Usage: "The machine type to use for the worker nodes",
 	}
 	driverFlag.Options["credential"] = &types.Flag{
-		Type:  types.StringType,
-		Usage: "The contents of the GC credential file",
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "The contents of the GC credential file",
 	}
 	driverFlag.Options["enable-kubernetes-dashboard"] = &types.Flag{
 		Type:  types.BoolType,
@@ -854,4 +855,29 @@ func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, upd
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func (d *Driver) GetK8SCapabilities(ctx context.Context, options *types.DriverOptions) (*types.K8SCapabilities, error) {
+	state, err := getStateFromOpts(options)
+	if err != nil {
+		return nil, err
+	}
+
+	capabilities := &types.K8SCapabilities{
+		L4LoadBalancer: &types.LoadBalancerCapabilities{
+			Enabled:              true,
+			Provider:             "GCLB",
+			ProtocolsSupported:   []string{"TCP", "UDP"},
+			HealthCheckSupported: true,
+		},
+	}
+	if state.EnableHTTPLoadBalancing != nil && *state.EnableHTTPLoadBalancing {
+		capabilities.IngressControllers = []*types.IngressCapabilities{
+			{
+				IngressProvider:      "GCLB",
+				CustomDefaultBackend: true,
+			},
+		}
+	}
+	return capabilities, nil
 }

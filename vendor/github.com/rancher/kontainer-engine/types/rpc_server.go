@@ -97,6 +97,10 @@ func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilit
 	return s.driver.GetCapabilities(ctx)
 }
 
+func (s *GrpcServer) GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error) {
+	return s.driver.GetK8SCapabilities(ctx, opts)
+}
+
 // Serve serves a grpc server.  Sends errors to the error channel if they occur
 func (s *GrpcServer) Serve(listenAddr string, errChan chan error) {
 	listen, err := net.Listen("tcp", listenAddr)
@@ -119,7 +123,7 @@ func (s *GrpcServer) Serve(listenAddr string, errChan chan error) {
 func (s *GrpcServer) ServeOrDie(listenAddr string) {
 	listen, err := net.Listen("tcp", listenAddr)
 	if err != nil {
-		logrus.Fatalf("%v", err)
+		logrus.Fatal(err)
 	}
 	addr := listen.Addr().String()
 	s.address <- addr
