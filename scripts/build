@@ -8,11 +8,11 @@ cd $(dirname $0)/..
 mkdir -p bin
 [ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
 
-CGO_ENABLED=0 go build -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/kontainer-engine-example-driver
+CGO_ENABLED=0 go build -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/kontainer-engine-driver-example
 echo built default
 for i in darwin linux
 do
     export GOOS=$i
-    go build -o bin/kontainer-engine-example-driver-$i
+    go build -o bin/kontainer-engine-driver-example-$i
     echo built $i
 done
