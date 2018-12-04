@@ -16,9 +16,9 @@ if echo $TAG | grep -q dirty; then
     TAG=dev
 fi
 
-cp ../bin/kontainer-engine-example-driver .
+cp ../bin/kontainer-engine-driver-example .
 
-IMAGE=${REPO}/kontainer-engine-example-driver:${TAG}
+IMAGE=${REPO}/kontainer-engine-driver-example:${TAG}
 docker build -t ${IMAGE} .
 echo ${IMAGE} > ../dist/images
 echo Built ${IMAGE}
