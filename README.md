@@ -10,7 +10,7 @@ Kontainer Engine Example Driver
 
 ## Running
 
-`./bin/kontainer-engine-example-driver`
+`./bin/kontainer-engine-driver-example`
 
 ## License
 Copyright (c) 2018 [Rancher Labs, Inc.](http://rancher.com)
