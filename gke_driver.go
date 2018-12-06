@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/rancher/kontainer-engine/drivers/options"
+	"github.com/rancher/kontainer-engine/drivers/util"
 	"github.com/rancher/kontainer-engine/types"
 	"github.com/rancher/rke/log"
 	"github.com/sirupsen/logrus"
@@ -112,6 +113,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag := types.DriverFlags{
 		Options: make(map[string]*types.Flag),
 	}
+	driverFlag.Options["name"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "the internal name of the cluster in Rancher",
+	}
 	driverFlag.Options["display-name"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "the name of the cluster that should be displayed to the user",
@@ -123,7 +128,9 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["zone"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "The zone to launch the cluster",
-		Value: "us-central1-a",
+		Default: &types.Default{
+			DefaultString: "us-central1-a",
+		},
 	}
 	driverFlag.Options["gke-credential-path"] = &types.Flag{
 		Type:  types.StringType,
@@ -144,12 +151,16 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["node-count"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "The number of nodes to create in this cluster",
-		Value: "3",
+		Default: &types.Default{
+			DefaultInt: 3,
+		},
 	}
 	driverFlag.Options["disk-size-gb"] = &types.Flag{
 		Type:  types.IntType,
 		Usage: "Size of the disk attached to each node",
-		Value: "100",
+		Default: &types.Default{
+			DefaultInt: 100,
+		},
 	}
 	driverFlag.Options["labels"] = &types.Flag{
 		Type:  types.StringSliceType,
@@ -170,28 +181,88 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 	driverFlag.Options["enable-stackdriver-logging"] = &types.Flag{
 		Type:  types.BoolPointerType,
 		Usage: "Disable stackdriver logging",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
 	}
 	driverFlag.Options["enable-stackdriver-monitoring"] = &types.Flag{
 		Type:  types.BoolPointerType,
 		Usage: "Disable stackdriver monitoring",
-	}
-	driverFlag.Options["enable-network-policy"] = &types.Flag{
-		Type:  types.BoolPointerType,
-		Usage: "Disable network policy",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
 	}
 	driverFlag.Options["kubernetes-dashboard"] = &types.Flag{
 		Type:  types.BoolType,
 		Usage: "Enable the kubernetes dashboard",
-	}
-	driverFlag.Options["enable-http-load-balancing"] = &types.Flag{
-		Type:  types.BoolPointerType,
-		Usage: "Enable http load balancing (defaults to true)",
 	}
 	driverFlag.Options["maintenance-window"] = &types.Flag{
 		Type:  types.StringType,
 		Usage: "When to performance updates on the nodes, in 24-hour time (e.g. \"19:00\")",
 	}
 
+	driverFlag.Options["node-pool"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The ID of the cluster node pool",
+	}
+	driverFlag.Options["node-version"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The version of kubernetes to use on the nodes",
+	}
+	driverFlag.Options["machine-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The machine type to use for the worker nodes",
+	}
+	driverFlag.Options["credential"] = &types.Flag{
+		Type:     types.StringType,
+		Password: true,
+		Usage:    "The contents of the GC credential file",
+	}
+	driverFlag.Options["enable-kubernetes-dashboard"] = &types.Flag{
+		Type:  types.BoolType,
+		Usage: "Whether to enable the kubernetes dashboard",
+	}
+	driverFlag.Options["image-type"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The image to use for the worker nodes",
+	}
+	driverFlag.Options["network"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The network to use for the cluster",
+	}
+	driverFlag.Options["sub-network"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "The sub-network to use for the cluster",
+	}
+	driverFlag.Options["enable-legacy-abac"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "Whether to enable legacy abac on the cluster",
+	}
+	driverFlag.Options["locations"] = &types.Flag{
+		Type:  types.StringSliceType,
+		Usage: "Locations to use for the cluster",
+	}
+	driverFlag.Options["enable-horizontal-pod-autoscaling"] = &types.Flag{
+		Type:  types.BoolPointerType,
+		Usage: "Enable horizontal pod autoscaling for the cluster",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
+	}
+	driverFlag.Options["enable-http-load-balancing"] = &types.Flag{
+		Type:  types.BoolPointerType,
+		Usage: "Enable http load balancing for the cluster",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
+	}
+	driverFlag.Options["enable-network-policy-config"] = &types.Flag{
+		Type:  types.BoolPointerType,
+		Usage: "Enable network policy config for the cluster",
+		Default: &types.Default{
+			DefaultBool: true,
+		},
+	}
 	return &driverFlag, nil
 }
 
@@ -563,6 +634,14 @@ func (d *Driver) getServiceClient(ctx context.Context, state state) (*raw.Servic
 		return nil, err
 	}
 
+	// This is here because for some reason the first call to token fails
+	// when run in a separate binary (but the built in driver version of GKE
+	// does not fail).  This call "primes" the token source and prevents the
+	// failure from preventing the cluster from being created.  The call will
+	// fail so we ignore any failures and we also discard the token because
+	// only the Google cloud client will use it later on.
+	ts.Token()
+
 	// Unlocks
 	cleanup()
 
@@ -597,7 +676,7 @@ func generateServiceAccountTokenForGke(cluster *raw.Cluster) (string, error) {
 		return "", err
 	}
 
-	return GenerateServiceAccountToken(clientset)
+	return util.GenerateServiceAccountToken(clientset)
 }
 
 func (d *Driver) waitCluster(ctx context.Context, svc *raw.Service, state *state) error {
@@ -784,4 +863,29 @@ func (d *Driver) updateAndWait(ctx context.Context, info *types.ClusterInfo, upd
 
 func (d *Driver) GetCapabilities(ctx context.Context) (*types.Capabilities, error) {
 	return &d.driverCapabilities, nil
+}
+
+func (d *Driver) GetK8SCapabilities(ctx context.Context, options *types.DriverOptions) (*types.K8SCapabilities, error) {
+	state, err := getStateFromOpts(options)
+	if err != nil {
+		return nil, err
+	}
+
+	capabilities := &types.K8SCapabilities{
+		L4LoadBalancer: &types.LoadBalancerCapabilities{
+			Enabled:              true,
+			Provider:             "GCLB",
+			ProtocolsSupported:   []string{"TCP", "UDP"},
+			HealthCheckSupported: true,
+		},
+	}
+	if state.EnableHTTPLoadBalancing != nil && *state.EnableHTTPLoadBalancing {
+		capabilities.IngressControllers = []*types.IngressCapabilities{
+			{
+				IngressProvider:      "GCLB",
+				CustomDefaultBackend: true,
+			},
+		}
+	}
+	return capabilities, nil
 }
