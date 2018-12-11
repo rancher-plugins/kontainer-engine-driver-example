@@ -167,7 +167,7 @@ type CustomConfig struct {
 	// Optional - Docker socket on the node that will be used in tunneling
 	DockerSocket string `yaml:"docker_socket" json:"dockerSocket,omitempty"`
 	// SSH Private Key
-	SSHKey string            `yaml:"ssh_key" json:"sshKey,omitempty"`
+	SSHKey string            `yaml:"ssh_key" json:"sshKey,omitempty" norman:"type=password"`
 	Label  map[string]string `yaml:"label" json:"label,omitempty"`
 }
 
@@ -184,10 +184,12 @@ type NodeSpec struct {
 	Imported                 bool              `json:"imported"`
 	Description              string            `json:"description,omitempty"`
 	DisplayName              string            `json:"displayName"`
-	RequestedHostname        string            `json:"requestedHostname,omitempty" norman:"type=dnsLabel,nullable,noupdate,required"`
+	RequestedHostname        string            `json:"requestedHostname,omitempty" norman:"type=hostname,nullable,noupdate,required"`
 	InternalNodeSpec         v1.NodeSpec       `json:"internalNodeSpec"`
 	DesiredNodeLabels        map[string]string `json:"desiredNodeLabels,omitempty"`
 	DesiredNodeAnnotations   map[string]string `json:"desiredNodeAnnotations,omitempty"`
+	CurrentNodeLabels        map[string]string `json:"currentNodeLabels,omitempty"`
+	CurrentNodeAnnotations   map[string]string `json:"currentNodeAnnotations,omitempty"`
 	DesiredNodeUnschedulable string            `json:"desiredNodeUnschedulable,omitempty"`
 	NodeDrainInput           *NodeDrainInput   `json:"nodeDrainInput,omitempty"`
 }
