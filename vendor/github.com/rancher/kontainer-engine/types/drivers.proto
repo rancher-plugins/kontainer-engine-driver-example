@@ -15,6 +15,7 @@ service Driver {
     rpc SetNodeCount (SetNodeCountRequest) returns (Empty) {}
 
     rpc GetCapabilities(Empty) returns (Capabilities) {}
+    rpc GetK8sCapabilities (DriverOptions) returns (K8sCapabilities) {}
 }
 
 message Empty {
@@ -32,6 +33,8 @@ message Flag {
     string value = 3;
 
     Default default = 4;
+
+    bool password = 5;
 }
 
 message Default {
@@ -114,4 +117,23 @@ message SetVersionRequest {
 message SetNodeCountRequest {
     ClusterInfo info = 1;
     NodeCount count = 2;
+}
+
+message K8sCapabilities {
+    LoadBalancerCapabilities L4LoadBalancer = 1;
+    repeated IngressCapabilities IngressControllers = 2;
+    bool NodePoolScalingSupported = 3;
+    string NodePortRange = 4;
+}
+
+message LoadBalancerCapabilities {
+    bool Enabled = 1;
+    string Provider = 2;
+    repeated string ProtocolsSupported = 3;
+    bool HealthCheckSupported = 4;
+}
+
+message IngressCapabilities {
+    string IngressProvider = 1;
+    bool CustomDefaultBackend = 2;
 }

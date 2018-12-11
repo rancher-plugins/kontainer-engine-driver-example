@@ -22,7 +22,7 @@ type RancherKubernetesEngineConfig struct {
 	// Authorization mode configuration used in the cluster
 	Authorization AuthzConfig `yaml:"authorization" json:"authorization,omitempty"`
 	// Enable/disable strict docker version checking
-	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion"`
+	IgnoreDockerVersion bool `yaml:"ignore_docker_version" json:"ignoreDockerVersion" norman:"default=true"`
 	// Kubernetes version to use (if kubernetes image is specifed, image version takes precedence)
 	Version string `yaml:"kubernetes_version" json:"kubernetesVersion,omitempty"`
 	// List of private registries and their credentials
@@ -53,7 +53,7 @@ type BastionHost struct {
 	// SSH Agent Auth enable
 	SSHAgentAuth bool `yaml:"ssh_agent_auth,omitempty" json:"sshAgentAuth,omitempty"`
 	// SSH Private Key
-	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
+	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty" norman:"type=password"`
 	// SSH Private Key Path
 	SSHKeyPath string `yaml:"ssh_key_path" json:"sshKeyPath,omitempty"`
 }
@@ -64,7 +64,9 @@ type PrivateRegistry struct {
 	// User name for registry acces
 	User string `yaml:"user" json:"user,omitempty"`
 	// Password for registry access
-	Password string `yaml:"password" json:"password,omitempty"`
+	Password string `yaml:"password" json:"password,omitempty" norman:"type=password"`
+	// Default registry
+	IsDefault bool `yaml:"is_default" json:"isDefault,omitempty"`
 }
 
 type RKESystemImages struct {
@@ -107,7 +109,7 @@ type RKESystemImages struct {
 	//CanalFlannel image
 	CanalFlannel string `yaml:"canal_flannel" json:"canalFlannel,omitempty"`
 	// Weave Node image
-	WeaveNode string `yaml:"wave_node" json:"weaveNode,omitempty"`
+	WeaveNode string `yaml:"weave_node" json:"weaveNode,omitempty"`
 	// Weave CNI image
 	WeaveCNI string `yaml:"weave_cni" json:"weaveCni,omitempty"`
 	// Pod infra container image
@@ -140,7 +142,7 @@ type RKEConfigNode struct {
 	// SSH Agent Auth enable
 	SSHAgentAuth bool `yaml:"ssh_agent_auth,omitempty" json:"sshAgentAuth,omitempty"`
 	// SSH Private Key
-	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty"`
+	SSHKey string `yaml:"ssh_key" json:"sshKey,omitempty" norman:"type=password"`
 	// SSH Private Key Path
 	SSHKeyPath string `yaml:"ssh_key_path" json:"sshKeyPath,omitempty"`
 	// Node Labels
@@ -176,11 +178,11 @@ type ETCDService struct {
 	// External etcd prefix
 	Path string `yaml:"path" json:"path,omitempty"`
 	// Etcd Recurring snapshot Service
-	Snapshot bool `yaml:"snapshot" json:"snapshot,omitempty"`
+	Snapshot *bool `yaml:"snapshot" json:"snapshot,omitempty" norman:"default=true"`
 	// Etcd snapshot Retention period
-	Retention string `yaml:"retention" json:"retention,omitempty"`
+	Retention string `yaml:"retention" json:"retention,omitempty" norman:"default=72h"`
 	// Etcd snapshot Creation period
-	Creation string `yaml:"creation" json:"creation,omitempty"`
+	Creation string `yaml:"creation" json:"creation,omitempty" norman:"default=12h"`
 }
 
 type KubeAPIService struct {
@@ -189,7 +191,7 @@ type KubeAPIService struct {
 	// Virtual IP range that will be used by Kubernetes services
 	ServiceClusterIPRange string `yaml:"service_cluster_ip_range" json:"serviceClusterIpRange,omitempty"`
 	// Port range for services defined with NodePort type
-	ServiceNodePortRange string `yaml:"service_node_port_range" json:"serviceNodePortRange,omitempty"`
+	ServiceNodePortRange string `yaml:"service_node_port_range" json:"serviceNodePortRange,omitempty" norman:"default=30000-32767"`
 	// Enabled/Disable PodSecurityPolicy
 	PodSecurityPolicy bool `yaml:"pod_security_policy" json:"podSecurityPolicy,omitempty"`
 }
@@ -239,7 +241,7 @@ type BaseService struct {
 
 type NetworkConfig struct {
 	// Network Plugin That will be used in kubernetes cluster
-	Plugin string `yaml:"plugin" json:"plugin,omitempty"`
+	Plugin string `yaml:"plugin" json:"plugin,omitempty" norman:"default=canal"`
 	// Plugin options to configure network properties
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// CalicoNetworkProvider
@@ -248,11 +250,13 @@ type NetworkConfig struct {
 	CanalNetworkProvider *CanalNetworkProvider `yaml:",omitempty" json:"canalNetworkProvider,omitempty"`
 	// FlannelNetworkProvider
 	FlannelNetworkProvider *FlannelNetworkProvider `yaml:",omitempty" json:"flannelNetworkProvider,omitempty"`
+	// WeaveNetworkProvider
+	WeaveNetworkProvider *WeaveNetworkProvider `yaml:",omitempty" json:"weaveNetworkProvider,omitempty"`
 }
 
 type AuthnConfig struct {
 	// Authentication strategy that will be used in kubernetes cluster
-	Strategy string `yaml:"strategy" json:"strategy,omitempty"`
+	Strategy string `yaml:"strategy" json:"strategy,omitempty" norman:"default=x509"`
 	// Authentication options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// List of additional hostnames and IPs to include in the api server PKI cert
@@ -268,7 +272,7 @@ type AuthzConfig struct {
 
 type IngressConfig struct {
 	// Ingress controller type used by kubernetes
-	Provider string `yaml:"provider" json:"provider,omitempty"`
+	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=nginx"`
 	// Ingress controller options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 	// NodeSelector key pair
@@ -326,6 +330,8 @@ type Process struct {
 	HealthCheck HealthCheck `json:"healthCheck,omitempty"`
 	// Process docker container Labels
 	Labels map[string]string `json:"labels,omitempty"`
+	// Process docker publish container's port to host
+	Publish []string `json:"publish,omitempty"`
 }
 
 type HealthCheck struct {
@@ -369,6 +375,10 @@ type FlannelNetworkProvider struct {
 
 type CanalNetworkProvider struct {
 	FlannelNetworkProvider `yaml:",inline" json:",inline"`
+}
+
+type WeaveNetworkProvider struct {
+	Password string `yaml:"password,omitempty" json:"password,omitempty"`
 }
 
 type KubernetesServicesOptions struct {
@@ -559,7 +569,7 @@ type AWSCloudProvider struct {
 
 type MonitoringConfig struct {
 	// Monitoring server provider
-	Provider string `yaml:"provider" json:"provider,omitempty"`
+	Provider string `yaml:"provider" json:"provider,omitempty" norman:"default=metrics-server"`
 	// Metrics server options
 	Options map[string]string `yaml:"options" json:"options,omitempty"`
 }
