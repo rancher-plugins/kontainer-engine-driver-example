@@ -12,7 +12,16 @@ CGO_ENABLED=0 go build -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/kon
 echo built default
 for i in darwin linux
 do
-    export GOOS=$i
-    go build -o bin/kontainer-engine-driver-example-$i
-    echo built $i
+    if [ $i == "linux" ]; then
+        for arch in amd64 arm64
+        do
+            export GOOS=$i GOARCH=$arch
+            go build -o bin/kontainer-engine-driver-example-$i-$arch
+            echo built $i-$arch
+        done
+    else
+        export GOOS=$i GOARCH="amd64"
+        go build -o bin/kontainer-engine-driver-example-$i-amd64
+        echo built $i
+    fi
 done
