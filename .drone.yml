@@ -1,36 +1,57 @@
 ---
-pipeline:
-  build:
-    privileged: true
-    image: rancher/dapper:1.11.2
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-    - dapper ci
+kind: pipeline
+name: default
 
-  github-binary-publish-release:
-    image: plugins/github-release
-    files:
-    - bin/kontainer-engine-driver-example-*
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+
+- name: github-binary-publish-release
+  pull: default
+  image: plugins/github-release
+  settings:
     checksum:
     - sha256
-    secrets: [github_token]
-    when:
-      branch: master
-      event: tag
-      ref:
-        exclude: [ refs/tags/*rc* ]
+    files:
+    - "bin/kontainer-engine-driver-example-*"
+    api_key:
+      from_secret: github_token
+  when:
+    event:
+    - tag
+    ref:
+      exclude:
+      - "refs/tags/*rc*"
 
-  github-binary-publish-prerelease:
-    image: plugins/github-release
+- name: github-binary-publish-prerelease
+  pull: default
+  image: plugins/github-release
+  settings:
+    checksum:
+    - sha256
+    files:
+    - "bin/kontainer-engine-driver-example-*"
     prerelease: true
-    files:
-    - bin/kontainer-engine-driver-example-*
-    checksum:
-    - sha256
-    secrets: [github_token]
-    when:
-      branch: master
-      event: tag
-      ref:
-        include: [ refs/tags/*rc* ]
+    api_key:
+      from_secret: github_token
+  when:
+    event:
+    - tag
+    ref:
+    - refs/head/master
+    - "refs/tags/*rc*"
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
