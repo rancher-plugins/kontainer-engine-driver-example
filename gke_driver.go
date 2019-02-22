@@ -263,6 +263,10 @@ func (d *Driver) GetDriverCreateOptions(ctx context.Context) (*types.DriverFlags
 			DefaultBool: true,
 		},
 	}
+	driverFlag.Options["special-testing-field"] = &types.Flag{
+		Type:  types.StringType,
+		Usage: "This field exists only on the example driver so we can test schema updates in Rancher.",
+	}
 	return &driverFlag, nil
 }
 
