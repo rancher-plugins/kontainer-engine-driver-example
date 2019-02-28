@@ -72,6 +72,14 @@ func (s *GrpcServer) SetNodeCount(ctx context.Context, request *SetNodeCountRequ
 	return &Empty{}, s.driver.SetClusterSize(GetCtx(ctx), request.Info, request.Count)
 }
 
+func (s *GrpcServer) ETCDSave(ctx context.Context, request *SaveETCDSnapshotRequest) (*Empty, error) {
+	return &Empty{}, s.driver.ETCDSave(ctx, request.Info, request.DriverOptions, request.SnapshotName)
+}
+
+func (s *GrpcServer) ETCDRestore(ctx context.Context, request *RestoreETCDSnapshotRequest) (*Empty, error) {
+	return &Empty{}, s.driver.ETCDRestore(ctx, request.Info, request.DriverOptions, request.SnapshotName)
+}
+
 // Remove implements grpc method
 func (s *GrpcServer) Remove(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
 	return &Empty{}, s.driver.Remove(GetCtx(ctx), clusterInfo)
@@ -99,6 +107,10 @@ func (s *GrpcServer) GetCapabilities(ctx context.Context, in *Empty) (*Capabilit
 
 func (s *GrpcServer) GetK8SCapabilities(ctx context.Context, opts *DriverOptions) (*K8SCapabilities, error) {
 	return s.driver.GetK8SCapabilities(ctx, opts)
+}
+
+func (s *GrpcServer) RemoveLegacyServiceAccount(ctx context.Context, clusterInfo *ClusterInfo) (*Empty, error) {
+	return &Empty{}, s.driver.RemoveLegacyServiceAccount(ctx, clusterInfo)
 }
 
 // Serve serves a grpc server.  Sends errors to the error channel if they occur

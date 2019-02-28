@@ -15,7 +15,11 @@ service Driver {
     rpc SetNodeCount (SetNodeCountRequest) returns (Empty) {}
 
     rpc GetCapabilities(Empty) returns (Capabilities) {}
+
+    rpc ETCDSave (SaveETCDSnapshotRequest) returns (Empty) {}
+    rpc ETCDRestore (RestoreETCDSnapshotRequest) returns (Empty) {}
     rpc GetK8sCapabilities (DriverOptions) returns (K8sCapabilities) {}
+    rpc RemoveLegacyServiceAccount(ClusterInfo) returns (Empty) {}
 }
 
 message Empty {
@@ -117,6 +121,18 @@ message SetVersionRequest {
 message SetNodeCountRequest {
     ClusterInfo info = 1;
     NodeCount count = 2;
+}
+
+message SaveETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
+}
+
+message RestoreETCDSnapshotRequest {
+	ClusterInfo  info = 1;
+	DriverOptions driver_options = 2;
+	string SnapshotName    = 3;
 }
 
 message K8sCapabilities {
