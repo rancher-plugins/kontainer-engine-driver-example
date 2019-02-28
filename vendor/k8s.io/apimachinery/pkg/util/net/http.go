@@ -19,7 +19,6 @@ package net
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -62,9 +61,6 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 // differentiate probable errors in connection behavior between normal "this is
 // disconnected" should use the method.
 func IsProbableEOF(err error) bool {
-	if err == nil {
-		return false
-	}
 	if uerr, ok := err.(*url.Error); ok {
 		err = uerr.Err
 	}
@@ -91,9 +87,8 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 		// ProxierWithNoProxyCIDR allows CIDR rules in NO_PROXY
 		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
-	// If no custom dialer is set, use the default context dialer
-	if t.DialContext == nil && t.Dial == nil {
-		t.DialContext = defaultTransport.DialContext
+	if t.Dial == nil {
+		t.Dial = defaultTransport.Dial
 	}
 	if t.TLSHandshakeTimeout == 0 {
 		t.TLSHandshakeTimeout = defaultTransport.TLSHandshakeTimeout
@@ -121,7 +116,7 @@ type RoundTripperWrapper interface {
 	WrappedRoundTripper() http.RoundTripper
 }
 
-type DialFunc func(ctx context.Context, net, addr string) (net.Conn, error)
+type DialFunc func(net, addr string) (net.Conn, error)
 
 func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	if transport == nil {
@@ -130,18 +125,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 
 	switch transport := transport.(type) {
 	case *http.Transport:
-		// transport.DialContext takes precedence over transport.Dial
-		if transport.DialContext != nil {
-			return transport.DialContext, nil
-		}
-		// adapt transport.Dial to the DialWithContext signature
-		if transport.Dial != nil {
-			return func(ctx context.Context, net, addr string) (net.Conn, error) {
-				return transport.Dial(net, addr)
-			}, nil
-		}
-		// otherwise return nil
-		return nil, nil
+		return transport.Dial, nil
 	case RoundTripperWrapper:
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
@@ -179,8 +163,10 @@ func FormatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 func GetHTTPClient(req *http.Request) string {
-	if ua := req.UserAgent(); len(ua) != 0 {
-		return ua
+	if userAgent, ok := req.Header["User-Agent"]; ok {
+		if len(userAgent) > 0 {
+			return userAgent[0]
+		}
 	}
 	return "unknown"
 }
@@ -320,11 +306,10 @@ type Dialer interface {
 }
 
 // ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
-// originalLocation). It returns the opened net.Conn, the raw response bytes, and the raw response bytes.
-// If requireSameHostRedirects is true, only redirects to the same host are permitted.
-func ConnectWithRedirects(processRedirect bool, originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, int, error) {
+// originalLocation). It returns the opened net.Conn and the raw response bytes.
+func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer) (net.Conn, []byte, error) {
 	const (
-		maxRedirects    = 9     // Fail on the 10th redirect
+		maxRedirects    = 10
 		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
 	)
 
@@ -334,7 +319,6 @@ func ConnectWithRedirects(processRedirect bool, originalMethod string, originalL
 		intermediateConn net.Conn
 		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
 		body             = originalBody
-		respCode         int
 	)
 
 	defer func() {
@@ -346,19 +330,19 @@ func ConnectWithRedirects(processRedirect bool, originalMethod string, originalL
 redirectLoop:
 	for redirects := 0; ; redirects++ {
 		if redirects > maxRedirects {
-			return nil, nil, 0, fmt.Errorf("too many redirects (%d)", redirects)
+			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
 		req, err := http.NewRequest(method, location.String(), body)
 		if err != nil {
-			return nil, nil, 0, err
+			return nil, nil, err
 		}
 
 		req.Header = header
 
 		intermediateConn, err = dialer.Dial(req)
 		if err != nil {
-			return nil, nil, 0, err
+			return nil, nil, err
 		}
 
 		// Peek at the backend response.
@@ -370,12 +354,6 @@ redirectLoop:
 		if err != nil {
 			// Unable to read the backend response; let the client handle it.
 			glog.Warningf("Error reading backend response: %v", err)
-			break redirectLoop
-		}
-
-		respCode = resp.StatusCode
-
-		if !processRedirect {
 			break redirectLoop
 		}
 
@@ -395,10 +373,14 @@ redirectLoop:
 
 		resp.Body.Close() // not used
 
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
 		// Prepare to follow the redirect.
 		redirectStr := resp.Header.Get("Location")
 		if redirectStr == "" {
-			return nil, nil, 0, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
 		}
 		// We have to parse relative to the current location, NOT originalLocation. For example,
 		// if we request http://foo.com/a and get back "http://bar.com/b", the result should be
@@ -406,22 +388,13 @@ redirectLoop:
 		// should be http://bar.com/c, not http://foo.com/c.
 		location, err = location.Parse(redirectStr)
 		if err != nil {
-			return nil, nil, 0, fmt.Errorf("malformed Location header: %v", err)
+			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
 		}
-
-		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
-		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			break redirectLoop
-		}
-
-		// Reset the connection.
-		intermediateConn.Close()
-		intermediateConn = nil
 	}
 
 	connToReturn := intermediateConn
 	intermediateConn = nil // Don't close the connection when we return it.
-	return connToReturn, rawResponse.Bytes(), respCode, nil
+	return connToReturn, rawResponse.Bytes(), nil
 }
 
 // CloneRequest creates a shallow copy of the request along with a deep copy of the Headers.
