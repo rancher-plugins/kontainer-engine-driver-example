@@ -27,6 +27,8 @@ steps:
     api_key:
       from_secret: github_token
   when:
+    instance:
+    - drone-publish.rancher.io
     event:
     - tag
     ref:
@@ -45,6 +47,8 @@ steps:
     api_key:
       from_secret: github_token
   when:
+    instance:
+    - drone-publish.rancher.io
     event:
     - tag
     ref:
