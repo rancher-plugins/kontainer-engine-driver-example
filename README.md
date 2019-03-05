@@ -224,7 +224,7 @@ release and can be downloaded from one of those URLs directly.
 
 Go to the `Cluster Drivers` management screen in Rancher and click 
 `Add Cluster Driver`. Enter the URL of your driver, a UI URL (see the UI 
-[skel repo](https://github.com/rancher/ui-driver-skel) for details), and a 
+[skel repo](https://github.com/rancher/ui-cluster-driver-skel) for details), and a 
 checksum (optional), and click `Create`. Rancher will automatically download 
 and install your driver. It will then become available to use on the 
 `Add Cluster` screen.
