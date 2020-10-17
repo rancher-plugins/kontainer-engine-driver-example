@@ -65,7 +65,7 @@ After being parsed by Rancher this field will be turned into the resource field 
 },
 ```
 
-Note that the name of the field was transformed from snake case to camel case 
+Note that the name of the field was transformed from kebab case to camel case 
 before the schema was generated.
 
 #### GetDriverUpdateOptions
